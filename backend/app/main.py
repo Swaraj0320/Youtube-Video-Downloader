@@ -192,6 +192,17 @@ class DownloadRequest(BaseModel):
     end: str | None = Field(default=None, max_length=16)
 
 def friendly(exc):
+    if isinstance(exc, media.ExtractionError):
+        if exc.reason in ('access_refused', 'player_response'):
+            return ('The source platform did not return an accessible player response. '
+                    'It may be restricting requests from this server or the video may be unavailable. '
+                    'Try another public video or retry later. Local access can work while cloud access is refused.')
+        if exc.reason == 'unavailable':
+            return 'This media is unavailable or restricted by the source platform. Try another public link.'
+        if exc.reason in ('javascript', 'runtime', 'invalid_metadata'):
+            return 'The server could not complete media extraction. The maintainer can check the sanitized extractor diagnostics for runtime or solver errors.'
+        if exc.reason == 'timeout':
+            return 'The source platform took too long to respond. Please retry later.'
     text = str(exc).lower()
     if isinstance(exc, ValueError):
         return str(exc)
@@ -203,7 +214,7 @@ def friendly(exc):
         return 'The operation timed out. Check your connection and retry.'
     if 'format' in text and ('not available' in text or 'requested' in text):
         return 'The selected quality is no longer available. Analyze the link again.'
-    if any(t in text for t in ('private', 'unavailable', 'sign in', 'bot', 'restricted', '403', '429', 'removed', 'login', 'log in', 'not granting access', 'empty media response', 'rate-limit')):
+    if any(t in text for t in ('private', 'unavailable', 'sign in', 'bot', 'restricted', '403', '429', 'removed', 'login', 'log in', 'not granting access', 'empty media response', 'rate-limit', 'failed to extract any player response', 'all player responses are invalid')):
         return 'The source did not allow access to this media. It may be restricted, unavailable, or temporarily blocked. Try another public video later.'
     return 'Media processing failed. Check your connection and dependencies, then retry. Details are in the backend log.'
 

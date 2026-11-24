@@ -13,6 +13,7 @@ import time
 import httpx
 from urllib.parse import urlparse, parse_qs, urljoin
 from .config import settings
+from .diagnostics import ExtractionError, failure_reason, log_extraction
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA_ROOT = Path(os.environ.get('TUBECLIP_DATA_DIR', str(ROOT))).resolve()
@@ -318,14 +319,46 @@ def base_command():
 
 
 def analyze_video(url, pinterest=False):
-    result = subprocess.run(base_command() + ['--dump-single-json', '--skip-download', url], capture_output=True, text=True, timeout=90)
+    # Capture verbose diagnostics on this single attempt, without adding a second
+    # network extraction or enabling HTTP traffic / player / challenge dumps.
+    cmd = [arg for arg in base_command() if arg != '--no-warnings']
+    cmd += ['--verbose', '--dump-single-json', '--skip-download', url]
+    started = time.monotonic()
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=90)
+    except (subprocess.TimeoutExpired, OSError) as exc:
+        reason = 'timeout' if isinstance(exc, subprocess.TimeoutExpired) else 'runtime'
+        stderr = getattr(exc, 'stderr', '') or ''
+        if isinstance(stderr, bytes):
+            stderr = stderr.decode('utf-8', errors='replace')
+        log_extraction(url, stderr, production=settings.production, returncode=None,
+                       elapsed=time.monotonic() - started, reason=reason)
+        raise ExtractionError(reason) from None
+    stderr = result.stderr or ''
     if result.returncode:
-        raise RuntimeError(result.stderr[-4000:])
-    info = json.loads(result.stdout)
+        reason = failure_reason(stderr)
+        log_extraction(url, stderr, production=settings.production, returncode=result.returncode,
+                       elapsed=time.monotonic() - started, reason=reason)
+        raise ExtractionError(reason)
+    if any(term in stderr.lower() for term in ('challenge solving failed', 'error solving', 'error running node')):
+        log_extraction(url, stderr, production=settings.production, returncode=0,
+                       elapsed=time.monotonic() - started)
+    try:
+        info = json.loads(result.stdout)
+    except json.JSONDecodeError:
+        log_extraction(url, stderr, production=settings.production, returncode=0,
+                       elapsed=time.monotonic() - started, reason='invalid_metadata')
+        raise ExtractionError('invalid_metadata') from None
     return video_info(info, url, platform='pinterest' if pinterest else 'youtube')
 
 
 def video_info(info, url, platform='youtube'):
+    # yt-dlp also returns mhtml storyboards from image hosts. They cannot be
+    # selected by our video/audio formats and must not enter download metadata.
+    # Remove them rather than widening the production media CDN allowlist.
+    info = {**info, 'formats': [f for f in (info.get('formats') or [])
+                              if not (f.get('protocol') == 'mhtml' and f.get('ext') == 'mhtml'
+                                      and f.get('vcodec') == 'none' and f.get('acodec') == 'none')]}
     if info.get('is_live') or info.get('_type') == 'playlist':
         raise ValueError('Ongoing live streams and playlists are not supported. Try a completed single video.')
     duration = info.get('duration')

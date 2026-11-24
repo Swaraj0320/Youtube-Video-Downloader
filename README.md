@@ -54,10 +54,11 @@ TubeClip uses a fixed dark theme with charcoal surfaces, off-white text, and red
 
 **Engine unavailable / missing FFmpeg:** Run `./setup.sh` again, then restart. Check `http://127.0.0.1:8000/api/health` for dependency status.
 
-**YouTube extraction fails:** Check that the video is publicly accessible, try a different single video, and update the extractor and its matching EJS scripts:
+**YouTube extraction fails:** Check that the video is publicly accessible and try a different single video. If dependencies drifted, reinstall the pinned runtime set:
 
 ```bash
-.venv/bin/python -m pip install -U "yt-dlp[default]"
+.venv/bin/python -m pip install -r backend/requirements.txt
+.venv/bin/python -m pip check
 ```
 
 Restart TubeClip afterward. Node is explicitly enabled as yt-dlp's JavaScript runtime. EJS scripts are installed via the `default` dependency group as described in the [official yt-dlp EJS setup guide](https://github.com/yt-dlp/yt-dlp/wiki/EJS). We do not import browser cookies or attempt to bypass restrictions. YouTube may temporarily block access even to public videos.
@@ -82,7 +83,7 @@ npm run build
 
 The tests generate an eight-second video and sine-wave audio locally, run real FFmpeg conversions and separate-stream merging, then exercise yt-dlp jobs through a local fixture server for full/clip video and MP3. They also cover exact resolution selection, invalid URLs/timestamps, unavailable dependencies, output filenames/serving, and cancellation. The fixture server is test-only; the public API accepts only validated YouTube video, Pinterest pin/share, and Instagram post/reel URLs. Pinterest tests also cover photo resolution selection, a real image download and MIME type, silent-video processing, missing codec metadata, and unsafe share redirects.
 
-`frontend/package-lock.json` and `tools/package-lock.json` record JavaScript dependencies. `backend/requirements.lock.txt` records the verified Python environment; install it with `.venv/bin/python -m pip install -r backend/requirements.lock.txt` when exact reproducibility is needed. Normal setup uses updateable version ranges so yt-dlp can receive extractor fixes.
+`frontend/package-lock.json` and `tools/package-lock.json` record JavaScript dependencies. `backend/requirements.lock.txt` pins all runtime Python dependencies. Both setup and Docker install `backend/requirements.txt`, which uses those constraints and pins yt-dlp 2026.10.26 with EJS 0.8.0. Setup no longer overwrites the lock with a workstation freeze. Test-only tools are installed separately through `requirements-dev.txt`. Update direct pins and the lock together, then test before deploying. See [extractor investigation and container checks](deploy/EXTRACTION.md) for sanitized diagnostics, version comparison, and the remaining cloud verification steps.
 
 ## Responsible use
 

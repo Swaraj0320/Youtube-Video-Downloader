@@ -20,6 +20,6 @@ JS
 ./tools/bin/ffmpeg -version | head -n 1
 ./tools/bin/ffprobe -version | head -n 1
 .venv/bin/python -m yt_dlp --version
-.venv/bin/python -m pip freeze > backend/requirements.lock.txt
+.venv/bin/python -m pip check
 (cd frontend && npm run build)
 echo "TubeClip setup complete. Run ./start.sh and open http://127.0.0.1:5173"
