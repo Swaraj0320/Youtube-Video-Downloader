@@ -1,0 +1,15 @@
+.git
+.venv
+frontend
+tools
+downloads
+temp
+backend/tests
+**/node_modules
+**/__pycache__
+.pytest_cache
+**/.env
+**/.env.*
+*.log
+*.tar.gz
+.DS_Store

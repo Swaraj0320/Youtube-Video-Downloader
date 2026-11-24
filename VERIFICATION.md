@@ -42,3 +42,18 @@ The interface now uses the supplied #242038 / #9067C6 / #8D86C9 / #CAC4CE / #F7E
 ## Original flower branding and pale canvas
 
 The original flower was extracted from the second PDF page using its existing alpha mask, preserving the artwork without AI regeneration. Transparent square, header, favicon, and touch-icon assets were exported and their alpha channels checked. Header/footer and browser icons now use the flower. The default page canvas is linen; dark mode uses a pale-slate canvas around dark panels. Build and HTTP asset checks pass.
+
+## Deployment preparation — 16 November 2026 (current)
+
+This section supersedes the earlier deployment assumptions while retaining the historical local/visual records above.
+
+- Backend: `PYTHONPATH=backend .venv/bin/python -m pytest backend/tests -q` — **105 passed**; one existing upstream Starlette/httpx deprecation warning. Includes the original real yt-dlp/FFmpeg local fixtures and new production CORS, ownership, signing, expiry, quota, health, cleanup, watchdog and configuration tests.
+- Frontend: `npm test --prefix frontend` — **4 passed** using Node's built-in test runner.
+- Frontend: `npm run build --prefix frontend` — TypeScript and Vite production build passed.
+- Separate Vercel-style build with `VERCEL=1` and placeholder `VITE_API_BASE_URL=https://backend.example.com` passed; the configured API origin was present in the compiled JavaScript. A Vercel-style build without the variable failed with the intended clear configuration error. The ordinary local build was then restored.
+- Python runtime dependencies resolved successfully in a pip dry run for **Python 3.12 / manylinux x86_64**, including matching yt-dlp and yt-dlp-ejs. This checks wheel availability/resolution, not a Linux runtime or cloud extraction.
+- Backend is now API-only, with a Render Free blueprint and separate frontend Vercel configuration. No personal hostname is embedded in the deployment files. Example environment files are unignored by Git and contain placeholders only.
+- UI CSS and markup layout were not changed by this preparation. The generated CSS asset hash remains `index-Cw-sm0MG.css`, matching the build before this deployment work. No new visual redesign was performed.
+- No Git push, cloud deployment, DNS update, paid service, or account change was performed.
+
+Verification limit: **Docker/Podman is not installed here**, so the image could not be built or started locally. A Docker build/start and actual Render extraction remain operator verification steps. Render Free's cold starts, ephemeral state, 0.1 CPU/512 MB limits, potential cloud-IP restrictions, usage quotas and possible overage billing are documented in README.md; large/long/4K jobs are not promised to work.
