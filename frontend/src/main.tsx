@@ -1,6 +1,6 @@
 import React, {useEffect, useRef, useState} from 'react'
 import {createRoot} from 'react-dom/client'
-import {ArrowDownToLine, ArrowRight, AudioLines, Check, CheckCheck, ChevronRight, Clipboard, Clock3, Film, ImageIcon, Link2, LoaderCircle, Music2, Play, RotateCcw, Scissors, ShieldCheck, Sun, Moon, X} from 'lucide-react'
+import {ArrowDownToLine, ArrowRight, AudioLines, Check, CheckCheck, ChevronRight, Clipboard, Clock3, Film, ImageIcon, Link2, LoaderCircle, Music2, Play, RotateCcw, Scissors, ShieldCheck, X} from 'lucide-react'
 import '@fontsource-variable/manrope'
 import '@fontsource-variable/newsreader/standard-italic.css'
 import './style.css'
@@ -24,12 +24,6 @@ async function saveFile(job:Job){
  link.remove()
 }
 function App(){
- const [theme,setTheme]=useState<'dark'|'light'>(()=>document.documentElement.dataset.theme==='light'?'light':'dark')
- useEffect(()=>{
-  document.documentElement.dataset.theme=theme
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content',theme==='dark'?'#100E10':'#FFFAEF')
-  try{localStorage.setItem('tubeclip-theme',theme)}catch{}
- },[theme])
  const [url,setUrl]=useState(''),[busy,setBusy]=useState(false),[video,setVideo]=useState<Video|null>(null),[quality,setQuality]=useState('best'),[mode,setMode]=useState('video'),[start,setStart]=useState(''),[end,setEnd]=useState(''),[error,setError]=useState(''),[job,setJob]=useState<Job|null>(null),[submitting,setSubmitting]=useState(false),[preview,setPreview]=useState(false),[embedFailed,setEmbedFailed]=useState(false),[online,setOnline]=useState<boolean|null>(null)
  const results=useRef<HTMLDivElement>(null)
  const downloadedJob=useRef<string|null>(null),submittedSelection=useRef<string|null>(null)
@@ -62,7 +56,7 @@ function App(){
      <span className="brand-name">TubeClip <span className="brand-credit">By Swaraj</span></span>
     </a>
     <div className="nav-caption">A small studio for your favorite moments.</div>
-    <div className="nav-actions"><button className="theme-toggle" aria-label={`Switch to ${theme==='dark'?'light':'dark'} theme`} title={`Switch to ${theme==='dark'?'light':'dark'} theme`} onClick={()=>setTheme(theme==='dark'?'light':'dark')}>{theme==='dark'?<Sun size={18}/>:<Moon size={18}/>}<span>{theme==='dark'?'Light mode':'Dark mode'}</span></button><span className="health nav-health"><i className={online?'healthy':online===false?'unhealthy':''}/>{online?'Download engine ready':online===false?'Engine unavailable':'Connecting to engine'}</span></div>
+    <div className="nav-actions"><span className="health nav-health"><i className={online?'healthy':online===false?'unhealthy':''}/>{online?'Download engine ready':online===false?'Engine unavailable':'Connecting to engine'}</span></div>
    </header>
    <main>
     <section className="hero" aria-labelledby="main-heading">

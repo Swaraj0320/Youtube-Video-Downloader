@@ -33,7 +33,7 @@ Keep that terminal open. Press **Ctrl+C** to stop both servers. If TubeClip is a
 
 ## Appearance
 
-The existing layout, typography, spacing, and original flower logo are retained. Light mode uses English Cream (`#FFFAEF`) for the page, white cards, and pale peach (`#FBEBD8`) for secondary surfaces. Dark mode uses charcoal page and card surfaces. Simple Red (`#D11D27`) marks primary actions and selected controls, Madder (`#A90011`) marks button hover states, and Vermillion (`#E53C38`) adds dark-mode highlights. Text stays dark in light mode and off-white in dark mode. The sun/moon toggle remembers your choice. Manrope and Newsreader fonts are served locally.
+TubeClip uses a fixed dark theme with charcoal surfaces, off-white text, and red actions and highlights. The existing layout, animations, spacing, original flower logo, and locally served Manrope and Newsreader fonts are retained. The app always opens in dark mode and has no theme switch or saved theme preference.
 
 ## Processing and limits
 
