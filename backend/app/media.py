@@ -27,7 +27,7 @@ def validate_duration(duration):
         raise ValueError(f'This personal demo accepts sources up to {settings.max_duration} seconds. Use a shorter source or run the app locally.')
 
 
-def validate_media_url(value):
+def validate_media_url(value, resolved_hosts=None):
     if not settings.production:
         return
     parsed = urlparse(value)
@@ -36,24 +36,29 @@ def validate_media_url(value):
     if (parsed.scheme != 'https' or parsed.username or parsed.password or parsed.port not in (None, 443)
             or not any(host == suffix or host.endswith('.' + suffix) for suffix in trusted)):
         raise ValueError('The source points outside the supported public media CDNs.')
+    if resolved_hosts is not None and host in resolved_hosts:
+        return
     try:
         addresses = socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
         if not addresses or any(not ipaddress.ip_address(address[4][0]).is_global for address in addresses):
             raise ValueError('Private or reserved network media addresses are not allowed.')
     except OSError:
         raise ValueError('The source media hostname could not be resolved.') from None
+    if resolved_hosts is not None:
+        resolved_hosts.add(host)
 
 
 def validate_download_info(info):
     if not settings.production:
         return
+    resolved_hosts = set()
     for f in [info, *(info.get('formats') or []), *(info.get('requested_formats') or []), *(info.get('requested_downloads') or [])]:
         for key in ('url', 'manifest_url', 'fragment_base_url'):
             if f.get(key):
-                validate_media_url(f[key])
+                validate_media_url(f[key], resolved_hosts)
         for fragment in f.get('fragments') or []:
             if fragment.get('url'):
-                validate_media_url(urljoin(f.get('fragment_base_url') or f.get('url') or '', fragment['url']))
+                validate_media_url(urljoin(f.get('fragment_base_url') or f.get('url') or '', fragment['url']), resolved_hosts)
 
 
 def binary(name):
@@ -262,10 +267,13 @@ def analyze_pinterest(url):
 
 def analyze(url):
     if urlparse(url).hostname == 'www.instagram.com':
-        return analyze_instagram(url)
-    if urlparse(url).hostname in ('pin.it', 'www.pinterest.com'):
-        return analyze_pinterest(url)
-    return analyze_video(url)
+        info = analyze_instagram(url)
+    elif urlparse(url).hostname in ('pin.it', 'www.pinterest.com'):
+        info = analyze_pinterest(url)
+    else:
+        info = analyze_video(url)
+    info['_extracted_at'] = time.time()
+    return info
 
 
 def timestamp(value):

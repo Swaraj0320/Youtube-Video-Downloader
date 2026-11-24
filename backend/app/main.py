@@ -1,4 +1,4 @@
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from contextlib import asynccontextmanager
 import importlib.metadata
 import json
@@ -31,6 +31,8 @@ if settings.production:
 lock = threading.RLock()
 jobs = {}
 analyses = {}
+analysis_pending = {}
+ANALYSIS_CACHE_SECONDS = 120
 executor = ThreadPoolExecutor(max_workers=settings.jobs)
 analysis_slots = threading.BoundedSemaphore(settings.analyses)
 TERMINAL = {'ready', 'failed', 'cancelled'}
@@ -223,33 +225,58 @@ def health():
     return JSONResponse(data, status_code=200 if healthy else 503)
 
 
+def analysis_response(info, url, owner):
+    token = str(uuid4())
+    with lock:
+        if len(analyses) >= (20 if settings.production else 100):
+            del analyses[next(iter(analyses))]
+        analyses[token] = {'info': info, 'source_url': url, 'created': time.time(), 'owner': owner}
+    return {**{key: value for key, value in info.items() if not key.startswith('_')}, 'analysis_id': token}
+
+
 @app.post('/api/analyze')
 def analyze(body: AnalyzeRequest, request: Request):
     try:
         url = media.source_url(body.url)
     except ValueError as exc:
         raise HTTPException(422, str(exc))
-    if not analysis_slots.acquire(blocking=False):
-        raise HTTPException(429, 'Analysis is busy. Please try again shortly.')
+    owner = request_owner(request)
+    key = (owner, url)
+    prune_records()
+    with lock:
+        for record in list(analyses.values()):
+            info = record['info']
+            # Keep the extraction timestamp unchanged on hits so signed URLs and
+            # metadata cannot be kept alive indefinitely by repeated requests.
+            age = time.time() - info.get('_extracted_at', 0)
+            if (record['owner'] == owner and record.get('source_url') == url
+                    and 0 <= age < min(ANALYSIS_CACHE_SECONDS, settings.analysis_ttl)):
+                return analysis_response(info, url, owner)
+        pending = analysis_pending.get(key)
+        leader = pending is None
+        if leader:
+            if not analysis_slots.acquire(blocking=False):
+                raise HTTPException(429, 'Analysis is busy. Please try again shortly.')
+            pending = analysis_pending[key] = Future()
     try:
-        prune_records()
-        info = media.analyze(url)
-        media.validate_duration(info.get('duration', 0))
-        token = str(uuid4())
-        with lock:
-            now = time.time()
-            for key in list(analyses):
-                if now - analyses[key]['created'] > settings.analysis_ttl:
-                    del analyses[key]
-            if len(analyses) >= (20 if settings.production else 100):
-                del analyses[next(iter(analyses))]
-            analyses[token] = {'info': info, 'created': now, 'owner': request_owner(request)}
-        return {**{key: value for key, value in info.items() if not key.startswith('_')}, 'analysis_id': token}
+        if leader:
+            info = media.analyze(url)
+            media.validate_duration(info.get('duration', 0))
+            response = analysis_response(info, url, owner)
+            pending.set_result(info)
+            return response
+        # A second click/tab for this client shares the running extraction.
+        return analysis_response(pending.result(timeout=95), url, owner)
     except Exception as exc:
+        if leader:
+            pending.set_exception(exc)
         log.exception('Analysis failed')
         raise HTTPException(422 if isinstance(exc, ValueError) else 502, friendly(exc))
     finally:
-        analysis_slots.release()
+        if leader:
+            with lock:
+                analysis_pending.pop(key, None)
+            analysis_slots.release()
 
 def update(job_id, **values):
     with lock:

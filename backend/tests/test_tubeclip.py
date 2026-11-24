@@ -78,7 +78,8 @@ def test_separate_stream_merge(sample):
 
 
 @pytest.fixture
-def client():
+def client(monkeypatch):
+    monkeypatch.setattr(main, 'analyses', {})
     return TestClient(main.app)
 
 
